@@ -13,9 +13,9 @@
     --paper-deep: #EFE8DA;
     --paper-light: #FBF8F1;
     --ink: #2E2B27;
-    --ink-soft: rgba(46, 43, 39, .68);
-    --ink-mute: rgba(46, 43, 39, .58);
-    --ink-faint: rgba(46, 43, 39, .44);
+    --ink-soft: rgba(46, 43, 39, .78);
+    --ink-mute: rgba(46, 43, 39, .68);
+    --ink-faint: rgba(46, 43, 39, .56);
     --line: rgba(46, 43, 39, .12);
     --line-strong: rgba(46, 43, 39, .22);
     --pink: #E9A3B5;
@@ -43,7 +43,7 @@
     background-color: var(--paper);
     background-image: radial-gradient(ellipse 110% 55% at 50% -8%, rgba(255, 255, 255, .34), transparent 68%);
     font-family: var(--sans);
-    font-weight: 300;
+    font-weight: 400;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -211,13 +211,6 @@
     font-weight: 400;
     line-height: 1;
     letter-spacing: .1em;
-  }
-  .hero-sub {
-    margin: 0;
-    font-family: var(--serif);
-    font-size: 13px;
-    letter-spacing: .17em;
-    color: var(--ink-soft);
   }
   .hero-meta {
     display: flex;
@@ -401,6 +394,45 @@
   }
   .record-card:hover { background: rgba(251, 248, 241, .86); border-color: var(--line); }
   .record-card:active { transform: scale(.993); }
+
+  /* 左滑删除 */
+  .record-swipe {
+    position: relative;
+    overflow: hidden;
+    border-radius: 3px;
+  }
+  .record-swipe .record-card {
+    position: relative;
+    z-index: 1;
+    background: #FBF8F1;
+    touch-action: pan-y;
+    will-change: transform;
+  }
+  .record-swipe .record-card:hover { background: #FBF8F1; }
+  .record-delete {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 78px;
+    padding: 0;
+    border: 0;
+    border-radius: 0 3px 3px 0;
+    background: #B4675C;
+    color: #FBF8F1;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .record-delete:active { background: #A65950; }
+  .record-delete:disabled { opacity: .6; }
   .record-thumb {
     width: 78px;
     height: 88px;
@@ -506,14 +538,14 @@
   }
 
   .empty {
-    padding: 44px 12px 44px;
+    padding: 52px 12px 56px;
     text-align: center;
   }
   .empty-mark {
     position: relative;
     width: 70px;
     height: 70px;
-    margin: 0 auto 27px;
+    margin: 0 auto 22px;
   }
   .empty-mark span {
     position: absolute;
@@ -531,13 +563,6 @@
     border: 0;
     background: var(--ink-soft);
     transform: translate(-50%, -50%);
-  }
-  .empty-title {
-    margin: 0 0 9px;
-    font-family: var(--serif);
-    font-size: 22px;
-    font-weight: 400;
-    letter-spacing: .11em;
   }
   .empty-text {
     max-width: 250px;
@@ -592,7 +617,7 @@
     background: var(--pink);
     color: var(--ink);
     font-size: 13.5px;
-    font-weight: 300;
+    font-weight: 500;
     letter-spacing: .15em;
     transform: translateX(-50%);
     cursor: pointer;
@@ -911,7 +936,7 @@
     background: transparent;
     font-size: 16px;
     line-height: 1.9;
-    font-weight: 300;
+    font-weight: 400;
     letter-spacing: .025em;
     transition: border-color .3s ease;
     -webkit-appearance: none;
@@ -1301,7 +1326,7 @@
     margin: 36px 0 0;
     font-size: 17px;
     line-height: 2;
-    font-weight: 300;
+    font-weight: 400;
     letter-spacing: .03em;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -1344,7 +1369,7 @@
     background: var(--ink);
     color: var(--paper);
     font-size: 11px;
-    font-weight: 300;
+    font-weight: 400;
     line-height: 1.6;
     letter-spacing: .05em;
     text-align: center;
@@ -1446,17 +1471,17 @@
   }
 
   /* 可读性：品牌字与全站辅助文字统一上调 */
-  .wordmark-cn { font-size: 42px; letter-spacing: .15em; }
-  .wordmark-en { font-size: 10.5px; letter-spacing: .2em; }
-  .local-note { padding-top: 12px; font-size: 11px; letter-spacing: .13em; }
-  .hero-month { font-size: 12px; letter-spacing: .19em; }
+  .wordmark-cn { font-size: 24px; font-weight: 500; letter-spacing: .16em; }
+  .wordmark-en { font-size: 10px; font-weight: 500; letter-spacing: .2em; color: var(--ink-soft); }
+  .local-note { padding-top: 10px; font-size: 11px; font-weight: 500; letter-spacing: .13em; color: var(--ink-soft); }
+  .hero-month { font-size: 12px; font-weight: 500; letter-spacing: .19em; }
   .hero-title {
-    font-size: clamp(32px, 9vw, 38px);
-    line-height: 1.05;
-    letter-spacing: .08em;
+    margin: 0;
+    font-size: clamp(28px, 7.6vw, 34px);
+    line-height: 1.5;
+    letter-spacing: .05em;
   }
-  .hero-sub { font-size: 16px; letter-spacing: .12em; }
-  .hero-meta { font-size: 12px; letter-spacing: .06em; }
+  .hero-meta { font-size: 12px; font-weight: 500; letter-spacing: .06em; }
   .timeline-loading { font-size: 13px; }
   .timeline-error { font-size: 14px; }
   .day-date { font-size: 22px; }
@@ -1466,8 +1491,7 @@
   .record-topline { font-size: 11px; letter-spacing: .06em; }
   .record-note { font-size: 15px; line-height: 1.72; }
   .mini-dot { width: 8px; height: 8px; }
-  .empty-title { font-size: 25px; }
-  .empty-text { max-width: 280px; font-size: 13.5px; line-height: 1.9; }
+  .empty-text { max-width: 280px; font-size: 13.5px; line-height: 1.9; color: var(--ink-mute); }
   .site-foot p { font-size: 10.5px; letter-spacing: .08em; }
   .record-fab { font-size: 15px; }
   .back-btn { font-size: 12px; letter-spacing: .08em; }
@@ -1508,10 +1532,18 @@
   .dialog-copy { font-size: 13px; }
   .dialog-btn { font-size: 12.5px; }
 
+  /* 小字统一加半档字重，避免在纸色底上发虚 */
+  .day-week, .day-count, .record-topline, .site-foot p,
+  .section-kicker, .section-kicker > :last-child, .palette-head,
+  .palette-head span:last-child, .photo-swap, .voice-timer, .voice-hint,
+  .audio-label, .audio-time, .record-privacy, .save-hint, .note-count,
+  .detail-date, .detail-kicker span:last-child, .detail-end,
+  .color-hex, .preview-hex, .empty-text { font-weight: 500; }
+
   @media (max-width: 370px) {
-    .wordmark-cn { font-size: 37px; }
+    .wordmark-cn { font-size: 21px; }
     .local-note { font-size: 10.5px; }
-    .hero-title { font-size: 32px; }
+    .hero-title { font-size: 26px; }
     .day-date { font-size: 21px; }
     .record-thumb, .record-art { width: 76px; height: 88px; }
     .color-hex { font-size: 10.5px; }
@@ -1545,8 +1577,7 @@
         </div>
         <div class="hero-copy">
           <p class="hero-month" id="heroMonth">二〇二六 · 十月</p>
-          <h1 class="hero-title">色谱</h1>
-          <p class="hero-sub">把日子，收成颜色。</p>
+          <h1 class="hero-title">把日子，<br>收成颜色。</h1>
           <p class="hero-meta" id="heroMeta">正在寻色</p>
         </div>
       </div>
@@ -1643,7 +1674,7 @@
             <span>可选</span>
           </div>
           <div class="note-wrap">
-            <textarea class="note-input" id="noteInput" maxlength="120" rows="3" placeholder="此刻的光，像什么？"></textarea>
+            <textarea class="note-input" id="noteInput" maxlength="120" rows="3" placeholder="此刻的你，想记录什么？"></textarea>
             <span class="note-count" id="noteCount">0 / 120</span>
           </div>
         </section>
@@ -1932,6 +1963,42 @@
       transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed'));
       transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted'));
     });
+  }
+
+  function deleteRecordFromDb(id) {
+    if (state.storageMode !== 'indexeddb' || !state.db) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      let transaction;
+      try {
+        transaction = state.db.transaction(STORE, 'readwrite');
+        transaction.objectStore(STORE).delete(id);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('IndexedDB delete failed'));
+      transaction.onabort = () => reject(transaction.error || new Error('IndexedDB delete aborted'));
+    });
+  }
+
+  async function removeRecord(record) {
+    await deleteRecordFromDb(record.id);
+    state.records = state.records.filter((item) => item.id !== record.id);
+    if (state.photoUrls.has(record.id)) {
+      URL.revokeObjectURL(state.photoUrls.get(record.id));
+      state.photoUrls.delete(record.id);
+    }
+    for (const [key, url] of Array.from(state.audioUrls.entries())) {
+      if (!key.startsWith(`${record.id}:`)) continue;
+      URL.revokeObjectURL(url);
+      state.audioUrls.delete(key);
+    }
+    openSwipeWrap = null;
+    renderTimeline();
+    showToast('这一页已经放下');
   }
 
   function photoUrlFor(record) {
@@ -2524,8 +2591,7 @@
     wrap.className = 'empty';
     wrap.innerHTML = `
       <div class="empty-mark" aria-hidden="true"><span></span><span></span><span></span></div>
-      <p class="empty-title">色谱还空着</p>
-      <p class="empty-text">拍下今天的颜色。日子会从第一笔开始，慢慢有了痕迹。</p>
+      <p class="empty-text">从今天的第一张照片开始。</p>
     `;
     return wrap;
   }
@@ -2566,7 +2632,117 @@
     return band;
   }
 
+  let openSwipeWrap = null;
+
+  function closeSwipe(wrap) {
+    if (!wrap) return;
+    const card = $('.record-card', wrap);
+    if (card) {
+      card.style.transition = 'transform .28s var(--ease)';
+      card.style.transform = 'translate3d(0, 0, 0)';
+    }
+    wrap.classList.remove('is-open');
+    if (openSwipeWrap === wrap) openSwipeWrap = null;
+  }
+
+  function setupSwipe(wrap, card, removeButton, record) {
+    const MAX = 78;
+    let startX = 0;
+    let startY = 0;
+    let base = 0;
+    let offset = 0;
+    let tracking = false;
+    let horizontal = false;
+    let moved = false;
+
+    const place = (value, animate) => {
+      offset = value;
+      card.style.transition = animate ? 'transform .28s var(--ease)' : 'none';
+      card.style.transform = `translate3d(${value}px, 0, 0)`;
+    };
+
+    card.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      if (openSwipeWrap && openSwipeWrap !== wrap) closeSwipe(openSwipeWrap);
+      tracking = true;
+      horizontal = false;
+      moved = false;
+      card.dataset.swiped = '';
+      startX = event.clientX;
+      startY = event.clientY;
+      base = offset;
+    });
+
+    card.addEventListener('pointermove', (event) => {
+      if (!tracking) return;
+      const dx = event.clientX - startX;
+      const dy = event.clientY - startY;
+      if (!horizontal) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        if (Math.abs(dy) >= Math.abs(dx)) {
+          tracking = false;
+          return;
+        }
+        horizontal = true;
+        if (card.setPointerCapture) card.setPointerCapture(event.pointerId);
+      }
+      moved = true;
+      place(clamp(base + dx, -MAX, 0), false);
+    });
+
+    const settle = () => {
+      if (!tracking) return;
+      tracking = false;
+      if (!horizontal) return;
+      const shouldOpen = offset < -MAX * .4;
+      place(shouldOpen ? -MAX : 0, true);
+      wrap.classList.toggle('is-open', shouldOpen);
+      openSwipeWrap = shouldOpen ? wrap : null;
+      card.dataset.swiped = moved ? '1' : '';
+    };
+    card.addEventListener('pointerup', settle);
+    card.addEventListener('pointercancel', settle);
+
+    card.addEventListener('click', () => {
+      if (card.dataset.swiped === '1') {
+        card.dataset.swiped = '';
+        return;
+      }
+      if (wrap.classList.contains('is-open')) {
+        closeSwipe(wrap);
+        return;
+      }
+      if (state.route.name === 'home') state.homeScroll = window.scrollY;
+      window.location.hash = `/detail/${encodeURIComponent(record.id)}`;
+    });
+
+    removeButton.addEventListener('focus', () => {
+      if (openSwipeWrap && openSwipeWrap !== wrap) closeSwipe(openSwipeWrap);
+      place(-MAX, true);
+      wrap.classList.add('is-open');
+      openSwipeWrap = wrap;
+    });
+
+    removeButton.addEventListener('click', async () => {
+      removeButton.disabled = true;
+      try {
+        await removeRecord(record);
+      } catch (error) {
+        removeButton.disabled = false;
+        showToast('这一页没有删掉，再试一次');
+      }
+    });
+  }
+
   function createRecordCard(record, index) {
+    const wrap = document.createElement('div');
+    wrap.className = 'record-swipe';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'record-delete';
+    removeButton.textContent = '删除';
+    wrap.append(removeButton);
+
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'record-card';
@@ -2627,11 +2803,10 @@
     card.append(info);
 
     card.setAttribute('aria-label', `${timeText(date)} 的记录${note ? '：' + note : ''}`);
-    card.addEventListener('click', () => {
-      if (state.route.name === 'home') state.homeScroll = window.scrollY;
-      window.location.hash = `/detail/${encodeURIComponent(record.id)}`;
-    });
-    return card;
+    removeButton.setAttribute('aria-label', `删除${timeText(date)}的记录`);
+    wrap.append(card);
+    setupSwipe(wrap, card, removeButton, record);
+    return wrap;
   }
 
   function createDayGroup(dateKey, records, groupIndex) {
@@ -2706,6 +2881,7 @@
 
   function renderTimeline() {
     const timeline = ui.timeline;
+    openSwipeWrap = null;
     timeline.innerHTML = '';
     if (!state.records.length) {
       timeline.append(makeEmptyState());
