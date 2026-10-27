@@ -407,6 +407,9 @@
     background: #FBF8F1;
     touch-action: pan-y;
     will-change: transform;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .record-swipe .record-card:hover { background: #FBF8F1; }
   .record-delete {
@@ -433,6 +436,23 @@
   }
   .record-delete:active { background: #A65950; }
   .record-delete:disabled { opacity: .6; }
+  /* 桌面端：鼠标没有"左滑"，改为悬停卡片时右侧浮现删除 */
+  @media (hover: hover) and (pointer: fine) {
+    .record-delete {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s var(--ease);
+    }
+    .record-swipe:hover .record-delete,
+    .record-swipe.is-hover .record-delete {
+      z-index: 2;
+      width: 52px;
+      opacity: 1;
+      pointer-events: auto;
+      background: rgba(180, 103, 92, .9);
+    }
+    .record-swipe:hover .record-delete:hover { background: #B4675C; }
+  }
   .record-thumb {
     width: 78px;
     height: 88px;
@@ -817,10 +837,60 @@
     aspect-ratio: 4 / 5;
     object-fit: cover;
     opacity: 0;
-    filter: saturate(.9) contrast(.96) brightness(1.03) sepia(.04);
+    filter: url(#lacquer) saturate(.97) contrast(.99) brightness(1.01);
     transition: opacity .5s ease;
+    touch-action: none;
+    cursor: crosshair;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   .photo-view img.is-loaded { opacity: 1; }
+  .loupe {
+    position: absolute;
+    z-index: 3;
+    width: 96px;
+    height: 96px;
+    margin: 0;
+    border: 2px solid var(--loupe-color, #FBF8F1);
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    box-shadow: 0 6px 22px rgba(46, 43, 39, .28), 0 0 0 1px rgba(46, 43, 39, .18);
+    transform: translate(-50%, -118%);
+    background: var(--paper-deep);
+  }
+  .loupe canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+  }
+  .loupe-cross {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border: 1.5px solid rgba(251, 248, 241, .92);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(46, 43, 39, .35);
+  }
+  .loupe-hex {
+    position: absolute;
+    z-index: 3;
+    padding: 3px 8px;
+    border-radius: 2px;
+    background: rgba(46, 43, 39, .82);
+    color: #FBF8F1;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .04em;
+    pointer-events: none;
+    transform: translate(-50%, -230%);
+    white-space: nowrap;
+  }
   .photo-view::after {
     content: "";
     position: absolute;
@@ -894,9 +964,20 @@
   .preview-swatch {
     flex: 1 1 0;
     min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
     opacity: 0;
     animation: swatchIn .45s var(--ease) forwards;
     animation-delay: calc(var(--i, 0) * 55ms);
+  }
+  .preview-swatch:active .preview-chip { transform: scale(.93); }
+  .preview-chip {
+    transition: transform .18s var(--ease);
   }
   @keyframes swatchIn {
     from { opacity: 0; transform: translateY(4px); }
@@ -1252,7 +1333,7 @@
     max-height: 60dvh;
     height: auto;
     opacity: 0;
-    filter: saturate(.93) contrast(.96) brightness(1.03) sepia(.035);
+    filter: url(#lacquer) saturate(.97) contrast(.99) brightness(1.01);
     transition: opacity .65s ease;
     object-fit: contain;
   }
@@ -1563,6 +1644,14 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="lacquer" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="2" seed="9" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
 <div class="app-shell" id="app">
   <main class="page home" id="page-home">
     <header class="hero">
@@ -1577,7 +1666,7 @@
         </div>
         <div class="hero-copy">
           <p class="hero-month" id="heroMonth">二〇二六 · 十月</p>
-          <h1 class="hero-title">把日子，<br>收成颜色。</h1>
+          <h1 class="hero-title">把日常，<br>收集成色谱。</h1>
           <p class="hero-meta" id="heroMeta">正在寻色</p>
         </div>
       </div>
@@ -1647,7 +1736,12 @@
           </div>
 
           <div class="photo-view" id="photoView" hidden>
-            <img id="draftPhoto" alt="刚刚选中的照片">
+            <img id="draftPhoto" alt="刚刚选中的照片" draggable="false">
+            <div class="loupe" id="loupe" hidden aria-hidden="true">
+              <canvas id="loupeCanvas" width="96" height="96"></canvas>
+              <span class="loupe-cross"></span>
+            </div>
+            <span class="loupe-hex" id="loupeHex" hidden></span>
             <div class="photo-loading" id="extracting" hidden>
               <span class="spinner" aria-hidden="true"></span>
               <span>正在拾取颜色</span>
@@ -1661,8 +1755,8 @@
 
           <div class="palette-preview" id="palettePreview" hidden>
             <div class="palette-head">
-              <span>照片里的五种颜色</span>
-              <span>自动拾取</span>
+              <span>照片里的颜色</span>
+              <span>按住照片取色 · 点色块去掉</span>
             </div>
             <div class="palette-strip" id="paletteStrip"></div>
           </div>
@@ -2410,8 +2504,8 @@
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
       context.drawImage(decoded.source, 0, 0, width, height);
-      const colors = extractPalette(canvas);
-      if (!colors || colors.length < 5) throw new Error('Palette extraction failed');
+      // 自动拾色只是初始建议：失败也不拦路，照片照样能存，颜色交给手指在照片上自取。
+      const colors = extractPalette(canvas) || [];
       let blob = null;
       try {
         blob = await canvasToBlob(canvas, 'image/jpeg', 0.86);
@@ -2423,6 +2517,7 @@
         blob,
         url: URL.createObjectURL(blob),
         colors,
+        canvas,
         width,
         height
       };
@@ -2684,7 +2779,9 @@
           return;
         }
         horizontal = true;
-        if (card.setPointerCapture) card.setPointerCapture(event.pointerId);
+        if (card.setPointerCapture) {
+          try { card.setPointerCapture(event.pointerId); } catch (error) { /* 合成事件或旧浏览器不支持时忽略 */ }
+        }
       }
       moved = true;
       place(clamp(base + dx, -MAX, 0), false);
@@ -2714,6 +2811,14 @@
       }
       if (state.route.name === 'home') state.homeScroll = window.scrollY;
       window.location.hash = `/detail/${encodeURIComponent(record.id)}`;
+    });
+
+    // 桌面端没有左滑手势：鼠标进入卡片时直接露出删除入口。
+    wrap.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse') wrap.classList.add('is-hover');
+    });
+    wrap.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'mouse') wrap.classList.remove('is-hover');
     });
 
     removeButton.addEventListener('focus', () => {
@@ -3350,14 +3455,17 @@
       previewUrl: null,
       colors: null,
       processing: false,
-      audioClips: []
+      audioClips: [],
+      pickCanvas: null,
+      pickCtx: null
     };
   }
 
   function updateSaveState() {
     if (!ui.saveBtn) return;
     const draft = state.draft;
-    const hasPhoto = Boolean(draft && draft.photoBlob && Array.isArray(draft.colors) && draft.colors.length === 5);
+    const colorCount = draft && Array.isArray(draft.colors) ? draft.colors.length : 0;
+    const hasPhoto = Boolean(draft && draft.photoBlob && colorCount >= 1);
     const working = Boolean(draft && draft.processing);
     const ready = hasPhoto && !working && !voice.recording && !voice.starting && !state.saving;
     ui.saveBtn.disabled = !ready;
@@ -3375,10 +3483,10 @@
       ui.saveHint.textContent = '正在拾色';
     } else if (!hasPhoto) {
       ui.saveText.textContent = '收进色谱';
-      ui.saveHint.textContent = '还没拾到颜色';
+      ui.saveHint.textContent = '按住照片，自己取一抹颜色';
     } else {
       ui.saveText.textContent = '收进色谱';
-      ui.saveHint.textContent = '五种颜色已就绪';
+      ui.saveHint.textContent = colorCount >= 5 ? '五种颜色已就绪' : `${colorCount} 种颜色，还能再取`;
     }
   }
 
@@ -3390,20 +3498,159 @@
   function renderPalettePreview(colors) {
     ui.paletteStrip.innerHTML = '';
     colors.forEach((hex, index) => {
-      const item = document.createElement('div');
+      const item = document.createElement('button');
+      item.type = 'button';
       item.className = 'preview-swatch';
       item.style.setProperty('--i', String(index));
+      item.title = '去掉这个颜色';
+      item.setAttribute('aria-label', `去掉颜色 ${hex}`);
       const chip = document.createElement('div');
       chip.className = 'preview-chip';
       chip.style.setProperty('--swatch', hex);
-      chip.title = hex;
       const label = document.createElement('span');
       label.className = 'preview-hex';
       label.textContent = hex;
+      item.addEventListener('click', () => {
+        const draft = state.draft;
+        if (!draft || !Array.isArray(draft.colors)) return;
+        draft.colors = draft.colors.filter((_, i) => i !== index);
+        renderPalettePreview(draft.colors);
+        updateSaveState();
+      });
       item.append(chip, label);
       ui.paletteStrip.append(item);
     });
     ui.palettePreview.hidden = false;
+  }
+
+  /* ---------------- 照片手动取色（放大镜） ---------------- */
+
+  function draftPickContext() {
+    const draft = state.draft;
+    if (!draft || !draft.pickCanvas) return null;
+    if (!draft.pickCtx) {
+      draft.pickCtx = draft.pickCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    return draft.pickCtx;
+  }
+
+  // 把指尖在 <img> 上的位置换算成分析画布上的像素坐标（img 是 object-fit: cover 裁切显示）。
+  function pickPointAt(clientX, clientY) {
+    const draft = state.draft;
+    const canvas = draft && draft.pickCanvas;
+    if (!canvas) return null;
+    const rect = ui.draftPhoto.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const scale = Math.max(rect.width / canvas.width, rect.height / canvas.height);
+    const drawnW = canvas.width * scale;
+    const drawnH = canvas.height * scale;
+    const fx = (clientX - rect.left - (rect.width - drawnW) / 2) / drawnW;
+    const fy = (clientY - rect.top - (rect.height - drawnH) / 2) / drawnH;
+    return {
+      x: clamp(Math.round(fx * (canvas.width - 1)), 0, canvas.width - 1),
+      y: clamp(Math.round(fy * (canvas.height - 1)), 0, canvas.height - 1),
+      canvas
+    };
+  }
+
+  function samplePickColor(point) {
+    const ctx = draftPickContext();
+    if (!ctx) return null;
+    // 取 3×3 均值，避免单像素噪点让颜色发飘。
+    const size = 3;
+    const x0 = clamp(point.x - 1, 0, point.canvas.width - size);
+    const y0 = clamp(point.y - 1, 0, point.canvas.height - size);
+    let data;
+    try {
+      data = ctx.getImageData(x0, y0, size, size).data;
+    } catch (error) {
+      return null;
+    }
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+      n += 1;
+    }
+    if (!n) return null;
+    return rgbToHex(Math.round(r / n), Math.round(g / n), Math.round(b / n));
+  }
+
+  function updateLoupe(clientX, clientY, point, hex) {
+    const rect = ui.photoView.getBoundingClientRect();
+    const x = clamp(clientX - rect.left, 50, rect.width - 50);
+    const y = clientY - rect.top;
+    // 指尖上方放不下时，放大镜翻到下方，避免顶出照片外。
+    const flip = y < 160;
+    ui.loupe.style.left = `${x}px`;
+    ui.loupe.style.top = `${y}px`;
+    ui.loupe.style.transform = flip ? 'translate(-50%, 22%)' : 'translate(-50%, -118%)';
+    ui.loupe.style.setProperty('--loupe-color', hex);
+    ui.loupeHex.style.left = `${x}px`;
+    ui.loupeHex.style.top = `${y}px`;
+    ui.loupeHex.style.transform = flip ? 'translate(-50%, 126%)' : 'translate(-50%, -230%)';
+    ui.loupeHex.textContent = hex;
+    const lctx = ui.loupeCanvas.getContext('2d');
+    const zoom = 18;
+    const sx = clamp(point.x - zoom / 2, 0, point.canvas.width - zoom);
+    const sy = clamp(point.y - zoom / 2, 0, point.canvas.height - zoom);
+    lctx.imageSmoothingEnabled = false;
+    lctx.clearRect(0, 0, 96, 96);
+    lctx.drawImage(point.canvas, sx, sy, zoom, zoom, 0, 0, 96, 96);
+  }
+
+  function commitPickedColor(hex) {
+    const draft = state.draft;
+    if (!draft) return;
+    const colors = Array.isArray(draft.colors) ? draft.colors.slice() : [];
+    // 最多五色：取满后新的进来，最早的离开。
+    if (colors.length >= 5) colors.shift();
+    colors.push(hex);
+    draft.colors = colors;
+    renderPalettePreview(colors);
+    updateSaveState();
+    showToast(`拾起 ${hex}`);
+  }
+
+  function setupPicking() {
+    if (!ui.draftPhoto) return;
+    let picking = false;
+    const update = (event) => {
+      const point = pickPointAt(event.clientX, event.clientY);
+      if (!point) return;
+      const hex = samplePickColor(point);
+      if (!hex) return;
+      updateLoupe(event.clientX, event.clientY, point, hex);
+    };
+    ui.draftPhoto.addEventListener('pointerdown', (event) => {
+      if (!state.draft || !state.draft.pickCanvas || state.draft.processing) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      picking = true;
+      try { ui.draftPhoto.setPointerCapture(event.pointerId); } catch (error) { /* 某些浏览器不支持捕获，忽略 */ }
+      event.preventDefault();
+      ui.loupe.hidden = false;
+      ui.loupeHex.hidden = false;
+      update(event);
+    });
+    ui.draftPhoto.addEventListener('pointermove', (event) => {
+      if (!picking) return;
+      event.preventDefault();
+      update(event);
+    });
+    const finish = (event) => {
+      if (!picking) return;
+      picking = false;
+      ui.loupe.hidden = true;
+      ui.loupeHex.hidden = true;
+      if (event.type !== 'pointerup') return;
+      const point = pickPointAt(event.clientX, event.clientY);
+      if (!point) return;
+      const hex = samplePickColor(point);
+      if (hex) commitPickedColor(hex);
+    };
+    ui.draftPhoto.addEventListener('pointerup', finish);
+    ui.draftPhoto.addEventListener('pointercancel', finish);
   }
 
   function resetPhotoArea() {
@@ -3507,6 +3754,8 @@
     state.draft.previewUrl = rawUrl;
     state.draft.photoBlob = null;
     state.draft.colors = null;
+    state.draft.pickCanvas = null;
+    state.draft.pickCtx = null;
     state.draft.processing = true;
     state.draft.photoSeq = sequence;
 
@@ -3529,6 +3778,8 @@
       const oldPreview = state.draft.previewUrl;
       state.draft.photoBlob = prepared.blob;
       state.draft.colors = prepared.colors;
+      state.draft.pickCanvas = prepared.canvas;
+      state.draft.pickCtx = null;
       state.draft.previewUrl = prepared.url;
       ui.draftPhoto.src = prepared.url;
       ui.draftPhoto.classList.remove('is-loaded');
@@ -3544,6 +3795,8 @@
       state.draft.previewUrl = null;
       state.draft.photoBlob = null;
       state.draft.colors = null;
+      state.draft.pickCanvas = null;
+      state.draft.pickCtx = null;
       resetPhotoArea();
       updateSaveState();
       console.error('拾色：照片处理失败', error);
@@ -3611,7 +3864,7 @@
     event.preventDefault();
     if (state.saving) return;
     const draft = state.draft;
-    if (!draft || !draft.photoBlob || !draft.colors || draft.colors.length !== 5 || draft.processing) return;
+    if (!draft || !draft.photoBlob || !draft.colors || draft.colors.length < 1 || draft.processing) return;
     if (voice.recording || voice.starting) {
       showToast('先松开录音，再收进色谱');
       return;
@@ -3957,6 +4210,9 @@
       albumInput: $('#albumInput'),
       palettePreview: $('#palettePreview'),
       paletteStrip: $('#paletteStrip'),
+      loupe: $('#loupe'),
+      loupeCanvas: $('#loupeCanvas'),
+      loupeHex: $('#loupeHex'),
       noteInput: $('#noteInput'),
       noteCount: $('#noteCount'),
       holdVoice: $('#holdVoice'),
@@ -3979,6 +4235,7 @@
       leaveBtn: $('#leaveBtn')
     });
     bindEvents();
+    setupPicking();
     detectVoiceSupport();
     try {
       state.db = await openDatabase();
@@ -4008,5 +4265,8 @@
   }
 })();
 </script>
+
+
+
 </body>
 </html>
