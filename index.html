@@ -715,7 +715,24 @@
     letter-spacing: .24em;
     white-space: nowrap;
   }
-  .subhead-right { justify-self: end; width: 40px; }
+  .subhead-right { justify-self: end; width: 40px; display: flex; justify-content: flex-end; }
+  .subhead-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink-mute);
+    cursor: pointer;
+    border-radius: 50%;
+    transition: color .2s ease, background .2s ease;
+  }
+  .subhead-icon:hover { color: #B4675C; background: rgba(180, 103, 92, .08); }
+  .subhead-icon:active { color: #A65950; }
+  .subhead-icon svg { width: 19px; height: 19px; }
 
   /* ---------- 记录页 ---------- */
   .record-body {
@@ -1834,7 +1851,13 @@
         <span>色谱</span>
       </button>
       <h2 class="subhead-title">一页颜色</h2>
-      <span class="subhead-right" aria-hidden="true"></span>
+      <span class="subhead-right">
+        <button class="subhead-icon" id="detailDelete" type="button" aria-label="删除这页颜色">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h16M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m-7 0v11.5A1.5 1.5 0 0 0 9.5 20h5a1.5 1.5 0 0 0 1.5-1.5V7"/>
+          </svg>
+        </button>
+      </span>
     </header>
     <div class="detail-body" id="detailContent"></div>
   </main>
@@ -1850,6 +1873,18 @@
     <div class="dialog-actions">
       <button class="dialog-btn secondary" id="leaveBtn" type="button">离开</button>
       <button class="dialog-btn primary" id="stayBtn" type="button">继续记录</button>
+    </div>
+  </div>
+</div>
+
+<div class="dialog-layer" id="deleteDialog" hidden>
+  <div class="dialog-backdrop" id="deleteBackdrop"></div>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="deleteDialogTitle" aria-describedby="deleteDialogCopy">
+    <h3 class="dialog-title" id="deleteDialogTitle">放下这页颜色？</h3>
+    <p class="dialog-copy" id="deleteDialogCopy">这张照片、颜色和声音都会从色谱里移除，无法找回。</p>
+    <div class="dialog-actions">
+      <button class="dialog-btn secondary" id="deleteCancelBtn" type="button">再想想</button>
+      <button class="dialog-btn" id="deleteConfirmBtn" type="button" style="background:#B4675C;color:#FBF8F1">放下</button>
     </div>
   </div>
 </div>
@@ -4242,6 +4277,15 @@
       document.body.classList.remove('is-locked');
       state.dialogReturnFocus = null;
     }
+    if (ui.deleteDialog && !ui.deleteDialog.hidden) {
+      ui.deleteDialog.hidden = true;
+      if (ui.appShell) ui.appShell.removeAttribute('inert');
+      document.body.classList.remove('is-locked');
+      state.dialogReturnFocus = null;
+    }
+    if (next.name !== 'detail') {
+      state.currentRecord = null;
+    }
     if (previous.name === 'home' && next.name !== 'home') {
       state.homeScroll = window.scrollY;
     }
@@ -4277,6 +4321,7 @@
       return;
     }
     state.route = next;
+    state.currentRecord = record;
     renderDurableRecord(record);
     setPage('detail');
     document.title = '拾色 · 一页颜色';
@@ -4330,6 +4375,36 @@
     if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
   }
 
+  function openDeleteDialog() {
+    if (!ui.deleteDialog || !state.currentRecord) return;
+    state.dialogReturnFocus = document.activeElement;
+    if (ui.appShell) ui.appShell.setAttribute('inert', '');
+    ui.deleteDialog.hidden = false;
+    document.body.classList.add('is-locked');
+    window.setTimeout(() => {
+      if (ui.deleteCancelBtn) ui.deleteCancelBtn.focus();
+    }, 30);
+  }
+
+  function closeDeleteDialog() {
+    if (!ui.deleteDialog) return;
+    ui.deleteDialog.hidden = true;
+    if (ui.appShell) ui.appShell.removeAttribute('inert');
+    document.body.classList.remove('is-locked');
+    const focusTarget = state.dialogReturnFocus;
+    state.dialogReturnFocus = null;
+    if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+  }
+
+  async function confirmDeleteRecord() {
+    const record = state.currentRecord;
+    if (!record) return;
+    closeDeleteDialog();
+    await removeRecord(record);
+    state.currentRecord = null;
+    replaceRoute('/');
+  }
+
   function hasDraftContent() {
     if (!state.draft) return false;
     return Boolean(
@@ -4359,6 +4434,10 @@
 
     ui.recordBack.addEventListener('click', requestLeaveRecord);
     ui.detailBack.addEventListener('click', () => replaceRoute('/'));
+    ui.detailDelete.addEventListener('click', openDeleteDialog);
+    ui.deleteCancelBtn.addEventListener('click', closeDeleteDialog);
+    ui.deleteBackdrop.addEventListener('click', closeDeleteDialog);
+    ui.deleteConfirmBtn.addEventListener('click', confirmDeleteRecord);
 
     ui.shootBtn.addEventListener('click', () => openPhotoPicker(ui.cameraInput));
     ui.albumBtn.addEventListener('click', () => openPhotoPicker(ui.albumInput));
@@ -4421,9 +4500,14 @@
     ui.dialogBackdrop.addEventListener('click', closeLeaveDialog);
 
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !ui.leaveDialog.hidden) {
-        event.preventDefault();
-        closeLeaveDialog();
+      if (event.key === 'Escape') {
+        if (ui.deleteDialog && !ui.deleteDialog.hidden) {
+          event.preventDefault();
+          closeDeleteDialog();
+        } else if (ui.leaveDialog && !ui.leaveDialog.hidden) {
+          event.preventDefault();
+          closeLeaveDialog();
+        }
       }
     });
 
@@ -4454,6 +4538,11 @@
       openRecord: $('#openRecord'),
       recordBack: $('#recordBack'),
       detailBack: $('#detailBack'),
+      detailDelete: $('#detailDelete'),
+      deleteDialog: $('#deleteDialog'),
+      deleteBackdrop: $('#deleteBackdrop'),
+      deleteCancelBtn: $('#deleteCancelBtn'),
+      deleteConfirmBtn: $('#deleteConfirmBtn'),
       recordForm: $('#recordForm'),
       photoEmpty: $('#photoEmpty'),
       photoView: $('#photoView'),
