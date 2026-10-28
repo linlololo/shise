@@ -1337,6 +1337,16 @@
     object-fit: contain;
   }
   .detail-photo.is-loaded { opacity: 1; }
+  .detail-missing {
+    margin: 28px 0;
+    padding: 38px 20px;
+    text-align: center;
+    font-size: 13px;
+    letter-spacing: .05em;
+    color: var(--ink-faint);
+    background: rgba(212, 200, 176, .14);
+    border-radius: 14px;
+  }
   .detail-date {
     display: flex;
     align-items: center;
@@ -2097,19 +2107,29 @@
   }
 
   function photoUrlFor(record) {
-    if (!record || !record.photo) return '';
+    if (!record || !record.photo || !(record.photo instanceof Blob)) return '';
     if (!state.photoUrls.has(record.id)) {
-      state.photoUrls.set(record.id, URL.createObjectURL(record.photo));
+      try {
+        state.photoUrls.set(record.id, URL.createObjectURL(record.photo));
+      } catch (error) {
+        console.warn('拾色：照片 Blob 无法生成 URL', record.id, error);
+        return '';
+      }
     }
-    return state.photoUrls.get(record.id);
+    return state.photoUrls.get(record.id) || '';
   }
 
   function thumbUrlFor(record) {
-    if (!record || !record.thumb) return '';
+    if (!record || !record.thumb || !(record.thumb instanceof Blob)) return '';
     if (!state.thumbUrls.has(record.id)) {
-      state.thumbUrls.set(record.id, URL.createObjectURL(record.thumb));
+      try {
+        state.thumbUrls.set(record.id, URL.createObjectURL(record.thumb));
+      } catch (error) {
+        console.warn('拾色：缩略图 Blob 无法生成 URL', record.id, error);
+        return '';
+      }
     }
-    return state.thumbUrls.get(record.id);
+    return state.thumbUrls.get(record.id) || '';
   }
 
   function hash2(x, y, seed) {
@@ -2255,25 +2275,30 @@
   function recordAudioClips(record) {
     if (!record) return [];
     if (Array.isArray(record.audioClips) && record.audioClips.length) {
-      return record.audioClips.filter((clip) => clip && clip.blob).map((clip) => ({
+      return record.audioClips.filter((clip) => clip && clip.blob instanceof Blob).map((clip) => ({
         blob: clip.blob,
         durationMs: Number(clip.durationMs) || 0,
         mime: clip.mime || clip.blob.type || 'audio/webm'
       }));
     }
-    if (record.audio) {
+    if (record.audio instanceof Blob) {
       return [{ blob: record.audio, durationMs: Number(record.audioDurationMs) || 0, mime: record.audio.type || 'audio/webm' }];
     }
     return [];
   }
 
   function audioUrlFor(record, index, blob) {
-    if (!record || !blob) return '';
+    if (!record || !blob || !(blob instanceof Blob)) return '';
     const key = `${record.id}:${index}`;
     if (!state.audioUrls.has(key)) {
-      state.audioUrls.set(key, URL.createObjectURL(blob));
+      try {
+        state.audioUrls.set(key, URL.createObjectURL(blob));
+      } catch (error) {
+        console.warn('拾色：音频 Blob 无法生成 URL', record.id, error);
+        return '';
+      }
     }
-    return state.audioUrls.get(key);
+    return state.audioUrls.get(key) || '';
   }
 
   /* ---------------- 颜色计算 ---------------- */
@@ -2694,6 +2719,74 @@
     } finally {
       if (decoded.cleanup) decoded.cleanup();
     }
+  }
+
+  async function migrateBlobFields() {
+    if (state.storageMode !== 'indexeddb' || !state.db) return;
+    console.info('拾色：开始迁移 Blob 字段，records 数量 =', state.records.length);
+    let changed = 0;
+    for (const record of state.records) {
+      let dirty = false;
+      for (const key of ['photo', 'audio']) {
+        if (typeof record[key] === 'string') {
+          // blob: URL 只在同一个 tab 生命周期内有效，刷新后必然失效，直接丢弃。
+          if (record[key].startsWith('blob:')) {
+            record[key] = null;
+            dirty = true;
+          } else if (record[key].startsWith('data:')) {
+            try {
+              const res = await fetch(record[key]);
+              record[key] = res.ok ? await res.blob() : null;
+            } catch (error) {
+              record[key] = null;
+            }
+            dirty = true;
+          } else {
+            record[key] = null;
+            dirty = true;
+          }
+        } else if (record[key] instanceof Blob && record[key].size === 0) {
+          record[key] = null;
+          dirty = true;
+        }
+      }
+      if (Array.isArray(record.audioClips)) {
+        for (const clip of record.audioClips) {
+          if (clip && typeof clip.blob === 'string') {
+            if (clip.blob.startsWith('blob:')) {
+              clip.blob = null;
+            } else if (clip.blob.startsWith('data:')) {
+              try {
+                const res = await fetch(clip.blob);
+                clip.blob = res.ok ? await res.blob() : null;
+              } catch (error) {
+                clip.blob = null;
+              }
+            } else {
+              clip.blob = null;
+            }
+            dirty = true;
+          }
+        }
+        const before = record.audioClips.length;
+        record.audioClips = record.audioClips.filter((clip) => clip && clip.blob instanceof Blob);
+        if (record.audioClips.length !== before) dirty = true;
+      }
+      if (record.thumb instanceof Blob && record.thumb.size === 0) {
+        record.thumb = null;
+        record.thumbVersion = 0;
+        dirty = true;
+      }
+      if (dirty) {
+        try {
+          await saveRecord(record);
+          changed += 1;
+        } catch (error) {
+          console.error('拾色：迁移 Blob 字段失败', error);
+        }
+      }
+    }
+    if (changed) console.info('拾色：迁移了 ' + changed + ' 条记录的失效字段');
   }
 
   async function migrateLegacyPalettes() {
@@ -3985,9 +4078,9 @@
     `).join('');
 
     ui.detailContent.innerHTML = `
-      <div class="detail-photo-wrap">
+      ${photoUrl ? `<div class="detail-photo-wrap">
         <img class="detail-photo" id="detailPhoto" src="${escapeHtml(photoUrl)}" alt="${note ? escapeHtml(note) : '一张记录了此刻颜色的照片'}">
-      </div>
+      </div>` : `<p class="detail-missing">这张照片，已经找不到了。</p>`}
       <p class="detail-date">${escapeHtml(detailDateText(date))}</p>
       <section class="detail-section" aria-labelledby="paletteKicker">
         <div class="detail-kicker" id="paletteKicker"><span>这张照片的颜色</span><span>${colors.length} 种</span></div>
@@ -4406,6 +4499,7 @@
       state.db = await openDatabase();
       state.records = await loadRecords();
       state.storageMode = 'indexeddb';
+      await migrateBlobFields();
     } catch (error) {
       // 预览环境、无痕模式或受限 iframe 可能禁止数据库。
       // 不阻断页面，改用内存记录，本次页面关闭后自动清空。
