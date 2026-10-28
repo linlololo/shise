@@ -433,16 +433,19 @@
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s var(--ease);
   }
   .record-delete:active { background: #A65950; }
   .record-delete:disabled { opacity: .6; }
+  /* 左滑打开时才露出删除按钮（手机端唯一显示时机） */
+  .record-swipe.is-open .record-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
   /* 桌面端：鼠标没有"左滑"，改为悬停卡片时右侧浮现删除 */
   @media (hover: hover) and (pointer: fine) {
-    .record-delete {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .18s var(--ease);
-    }
     .record-swipe:hover .record-delete,
     .record-swipe.is-hover .record-delete {
       z-index: 2;
