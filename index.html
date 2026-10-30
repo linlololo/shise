@@ -857,8 +857,10 @@
     aspect-ratio: 4 / 5;
     object-fit: cover;
     opacity: 0;
-    filter: url(#lacquer) saturate(.97) contrast(.99) brightness(1.01);
-    transition: opacity .5s ease;
+    filter: saturate(.97) contrast(.99) brightness(1.01);
+    transition: opacity .18s ease;
+    transform: translateZ(0);
+    backface-visibility: hidden;
     touch-action: none;
     cursor: crosshair;
     -webkit-user-select: none;
@@ -1680,6 +1682,25 @@
     background: currentColor;
     opacity: .55;
   }
+  .backup-bar {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    padding: 28px 0 40px;
+  }
+  .backup-btn {
+    appearance: none;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    opacity: .55;
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .backup-btn:active { opacity: .9; }
 </style>
 </head>
 <body>
@@ -1713,6 +1734,12 @@
 
     <div class="timeline" id="timeline" aria-live="polite">
       <div class="timeline-loading">正在寻色…</div>
+    </div>
+
+    <div class="backup-bar">
+      <button type="button" class="backup-btn" id="backupExport">导出备份</button>
+      <button type="button" class="backup-btn" id="backupImport">导入备份</button>
+      <input type="file" id="backupFile" accept="application/json,.json" hidden>
     </div>
 
     <footer class="site-foot">
@@ -2321,7 +2348,7 @@
   }
 
   /* ===== 开色缩略图（新增，独立模块，不改动原有函数） ===== */
-  const SK_OPEN_DAYS = 30;
+  const SK_OPEN_DAYS = 7;
   // 预览用：填 0 / 10 / 30 看对应天数的效果，看完改回 null
   const SK_OPEN_PREVIEW = null;
   const skThumbCache = new Map();
@@ -2376,9 +2403,12 @@
   function skOpening(record) {
     const created = new Date(record && record.createdAt).getTime() || Date.now();
     const days = SK_OPEN_PREVIEW != null ? SK_OPEN_PREVIEW : Math.floor((Date.now() - created) / 864e5);
-    const stage = Math.min(SK_OPEN_DAYS, Math.max(0, days));
+    if (days <= 0) {
+      return { stage: SK_OPEN_DAYS, p: 1, label: '新漆' };
+    }
+    const stage = Math.min(SK_OPEN_DAYS, days - 1);
     let label = '开色 ' + stage + '/' + SK_OPEN_DAYS;
-    if (stage === 0) label = '新漆';
+    if (stage === 0) label = '入荫';
     if (stage >= SK_OPEN_DAYS) label = '已开色';
     return { stage: stage, p: stage / SK_OPEN_DAYS, label: label };
   }
@@ -4624,6 +4654,92 @@
     }, 2650);
   }
 
+  // ===== 备份：导出 / 导入 =====
+  function bkBlobToB64(blob) {
+    return new Promise(function (resolve, reject) {
+      const fr = new FileReader();
+      fr.onload = function () { resolve(String(fr.result).split(',')[1] || ''); };
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+  }
+  function bkB64ToBlob(b64, type) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: type || '' });
+  }
+  async function bkPack(v) {
+    if (v instanceof Blob) return { __blob: 1, type: v.type, data: await bkBlobToB64(v) };
+    if (Array.isArray(v)) { const out = []; for (const x of v) out.push(await bkPack(x)); return out; }
+    if (v && typeof v === 'object') { const out = {}; for (const k of Object.keys(v)) out[k] = await bkPack(v[k]); return out; }
+    return v;
+  }
+  function bkUnpack(v) {
+    if (v && v.__blob === 1 && typeof v.data === 'string') return bkB64ToBlob(v.data, v.type);
+    if (Array.isArray(v)) return v.map(bkUnpack);
+    if (v && typeof v === 'object') { const out = {}; for (const k of Object.keys(v)) out[k] = bkUnpack(v[k]); return out; }
+    return v;
+  }
+  async function exportBackup() {
+    try {
+      const list = (state.records || []).slice();
+      if (!list.length) { showToast('还没有记录可以备份'); return; }
+      showToast('正在打包 ' + list.length + ' 条记录…');
+      const packed = [];
+      for (const r of list) packed.push(await bkPack(r));
+      const json = JSON.stringify({ app: 'shise', version: 1, exportedAt: new Date().toISOString(), records: packed });
+      const d = new Date();
+      const name = '拾色备份-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.json';
+      const file = new File([json], name, { type: 'application/json' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: name }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+      showToast('备份已导出');
+    } catch (err) {
+      console.error(err);
+      showToast('导出失败，请重试');
+    }
+  }
+  async function importBackup(file) {
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || data.app !== 'shise' || !Array.isArray(data.records)) { showToast('这不是拾色的备份文件'); return; }
+      const existing = new Set((state.records || []).map(function (r) { return r.id; }));
+      let added = 0, skipped = 0;
+      for (const raw of data.records) {
+        const rec = bkUnpack(raw);
+        if (!rec || !rec.id) continue;
+        if (existing.has(rec.id)) { skipped++; continue; }
+        await saveRecord(rec);
+        added++;
+      }
+      const list = await loadRecords();
+      if (Array.isArray(list)) state.records = list;
+      renderHome();
+      showToast('导入 ' + added + ' 条' + (skipped ? '，跳过重复 ' + skipped + ' 条' : ''));
+    } catch (err) {
+      console.error(err);
+      showToast('导入失败：文件可能已损坏');
+    }
+  }
+  function bindBackup() {
+    const ex = document.getElementById('backupExport');
+    const im = document.getElementById('backupImport');
+    const fi = document.getElementById('backupFile');
+    if (!ex || !im || !fi) return;
+    ex.addEventListener('click', exportBackup);
+    im.addEventListener('click', function () { fi.value = ''; fi.click(); });
+    fi.addEventListener('change', function () { importBackup(fi.files && fi.files[0]); });
+  }
+
   function openLeaveDialog() {
     if (!ui.leaveDialog) return;
     state.dialogReturnFocus = document.activeElement;
@@ -4852,6 +4968,7 @@
       leaveBtn: $('#leaveBtn')
     });
     bindEvents();
+    bindBackup();
     setupPicking();
     detectVoiceSupport();
     try {
