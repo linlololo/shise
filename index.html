@@ -2401,8 +2401,13 @@
   }
 
   function skOpening(record) {
-    const created = new Date(record && record.createdAt).getTime() || Date.now();
-    const days = SK_OPEN_PREVIEW != null ? SK_OPEN_PREVIEW : Math.floor((Date.now() - created) / 864e5);
+    const createdAt = new Date(record && record.createdAt).getTime() || Date.now();
+    const createdDay = new Date(createdAt);
+    createdDay.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // 按自然日算：当天=新漆，第二天=入荫，之后每天进一度
+    const days = SK_OPEN_PREVIEW != null ? SK_OPEN_PREVIEW : Math.round((today - createdDay) / 864e5);
     if (days <= 0) {
       return { stage: SK_OPEN_DAYS, p: 1, label: '新漆' };
     }
