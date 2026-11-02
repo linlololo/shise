@@ -1701,6 +1701,53 @@
     cursor: pointer;
   }
   .backup-btn:active { opacity: .9; }
+  /* ---------- 详情页：改字 / 追加语音 ---------- */
+  .detail-note-area { margin-top: 36px; }
+  .detail-note-view {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .detail-note-view .detail-note {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+  .detail-note-view.is-empty { justify-content: flex-start; }
+  .detail-mini-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    opacity: .5;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: .08em;
+    padding: 5px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .detail-mini-btn:active { opacity: .9; }
+  .detail-mini-btn.is-primary { opacity: .8; }
+  .detail-note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .detail-note-input { min-height: 84px; font-size: 16px; }
+  .detail-voice-console {
+    display: flex;
+    align-items: center;
+    gap: 17px;
+    padding: 2px 0 4px;
+  }
+  .detail-voice-btn { width: 74px; height: 74px; }
+  .detail-voice-btn svg { width: 17px; height: 17px; }
+  .detail-voice-btn .hold-label { font-size: 8px; letter-spacing: .06em; }
 </style>
 </head>
 <body>
@@ -2013,7 +2060,11 @@
     ticker: null,
     limitTimer: null,
     startedAt: 0,
-    mime: ''
+    mime: '',
+    // null 表示新建记录页；'detail' 表示详情页追加语音。
+    target: null,
+    targetRecord: null,
+    targetClips: null
   };
 
   /* ---------------- 时间与文本 ---------------- */
@@ -3780,28 +3831,101 @@
     updateVoiceCopy();
   }
 
+  // 语音控件元素：新建记录页 / 详情页共用同一套录音逻辑，只是界面不同。
+  function recordVoiceEls() {
+    return {
+      hold: ui.holdVoice,
+      label: ui.holdLabel,
+      state: ui.voiceState,
+      timer: ui.voiceTimer,
+      wave: ui.voiceWave,
+      hint: ui.voiceHint,
+      unsupported: ui.voiceUnsupported
+    };
+  }
+
+  function detailVoiceEls() {
+    return {
+      hold: ui.detailAddVoice,
+      label: ui.detailVoiceLabel,
+      state: ui.detailVoiceState,
+      timer: ui.detailVoiceTimer,
+      wave: ui.detailVoiceWave,
+      hint: ui.detailVoiceHint,
+      unsupported: ui.detailVoiceUnsupported
+    };
+  }
+
+  function voiceEls() {
+    return voice.target === 'detail' ? detailVoiceEls() : recordVoiceEls();
+  }
+
+  function voiceClipList() {
+    if (voice.target === 'detail') return voice.targetClips || [];
+    return state.draft && Array.isArray(state.draft.audioClips) ? state.draft.audioClips : [];
+  }
+
+  function voiceCanRecord() {
+    if (voice.target === 'detail') return state.route.name === 'detail' && Boolean(voice.targetRecord);
+    return state.route.name === 'record' && Boolean(state.draft);
+  }
+
   function updateVoiceCopy() {
-    if (!state.draft || !ui.voiceState) return;
+    const els = voiceEls();
+    if (!els.state) return;
     if (!voice.supported) {
-      ui.voiceState.textContent = '暂时不能录音';
-      ui.voiceTimer.textContent = '照片与文字仍可保存';
+      els.state.textContent = '暂时不能录音';
+      if (els.timer) els.timer.textContent = '照片与文字仍可保存';
       return;
     }
     if (voice.recording || voice.starting) return;
-    const clips = Array.isArray(state.draft.audioClips) ? state.draft.audioClips : [];
+    const clips = voiceClipList();
+    if (voice.target === 'detail') {
+      if (clips.length) {
+        const total = clips.reduce((sum, clip) => sum + (Number(clip.durationMs) || 0), 0);
+        els.state.textContent = `已留下 ${clips.length} 段声音`;
+        els.timer.textContent = `共 ${durationText(total)}`;
+        if (els.hint) els.hint.textContent = '按住可以继续加一段，不会覆盖前面的声音。每段最长 5 分钟。';
+      } else {
+        els.state.textContent = '按住开始，松手结束';
+        els.timer.textContent = '最长 5 分钟';
+        if (els.hint) els.hint.textContent = '把当时的声音，也补在这页里。';
+      }
+      return;
+    }
     if (clips.length) {
       const total = clips.reduce((sum, clip) => sum + clip.durationMs, 0);
-      ui.voiceState.textContent = `已留下 ${clips.length} 段声音`;
-      ui.voiceTimer.textContent = `共 ${durationText(total)}`;
-      ui.voiceHint.textContent = '按住可以继续加一段，不会覆盖前面的声音。每段最长 5 分钟。';
+      els.state.textContent = `已留下 ${clips.length} 段声音`;
+      els.timer.textContent = `共 ${durationText(total)}`;
+      if (els.hint) els.hint.textContent = '按住可以继续加一段，不会覆盖前面的声音。每段最长 5 分钟。';
     } else {
-      ui.voiceState.textContent = '按住说话，松手结束';
-      ui.voiceTimer.textContent = '最长 5 分钟';
-      ui.voiceHint.textContent = '把当时的声音，也留在一起。';
+      els.state.textContent = '按住说话，松手结束';
+      els.timer.textContent = '最长 5 分钟';
+      if (els.hint) els.hint.textContent = '把当时的声音，也留在一起。';
     }
   }
 
   /* ---------------- 录音 ---------------- */
+
+  function applyVoiceSupport(els) {
+    if (!els || !els.hold) return;
+    if (!voice.supported) {
+      els.hold.disabled = true;
+      els.hold.setAttribute('aria-disabled', 'true');
+      if (els.unsupported) {
+        els.unsupported.hidden = false;
+        els.unsupported.textContent = window.isSecureContext
+          ? '这个浏览器暂时不能录音；照片和文字仍然可以保存。'
+          : '录音需要在 HTTPS 或 localhost 页面打开；照片和文字仍然可以保存。';
+      }
+      if (els.state) els.state.textContent = '暂时不能录音';
+      if (els.timer) els.timer.textContent = '照片与文字仍可保存';
+    } else {
+      els.hold.disabled = false;
+      els.hold.removeAttribute('aria-disabled');
+      if (els.unsupported) els.unsupported.hidden = true;
+    }
+  }
 
   function detectVoiceSupport() {
     voice.supported = Boolean(
@@ -3809,21 +3933,8 @@
       typeof navigator.mediaDevices.getUserMedia === 'function' &&
       typeof window.MediaRecorder === 'function'
     );
-    if (!ui.holdVoice) return;
-    if (!voice.supported) {
-      ui.holdVoice.disabled = true;
-      ui.holdVoice.setAttribute('aria-disabled', 'true');
-      ui.voiceUnsupported.hidden = false;
-      ui.voiceUnsupported.textContent = window.isSecureContext
-        ? '这个浏览器暂时不能录音；照片和文字仍然可以保存。'
-        : '录音需要在 HTTPS 或 localhost 页面打开；照片和文字仍然可以保存。';
-      ui.voiceState.textContent = '暂时不能录音';
-      ui.voiceTimer.textContent = '照片与文字仍可保存';
-    } else {
-      ui.holdVoice.disabled = false;
-      ui.holdVoice.removeAttribute('aria-disabled');
-      ui.voiceUnsupported.hidden = true;
-    }
+    applyVoiceSupport(recordVoiceEls());
+    applyVoiceSupport(detailVoiceEls());
   }
 
   function chooseAudioMime() {
@@ -3857,21 +3968,24 @@
 
   function updateVoiceTimer() {
     if (!voice.recording) return;
+    const els = voiceEls();
+    if (!els.timer) return;
     const elapsed = performance.now() - voice.startedAt;
-    ui.voiceTimer.textContent = durationText(elapsed);
+    els.timer.textContent = durationText(elapsed);
   }
 
   function resetVoiceVisual() {
-    if (!ui.holdVoice) return;
+    const els = voiceEls();
+    if (!els.hold) return;
     voice.starting = false;
     voice.recording = false;
     voice.holding = false;
-    ui.holdVoice.classList.remove('is-recording', 'is-pressing');
-    ui.holdLabel.textContent = '按住';
-    ui.holdVoice.setAttribute('aria-label', '按住录音，松开结束');
-    ui.voiceWave.hidden = true;
+    els.hold.classList.remove('is-recording', 'is-pressing');
+    if (els.label) els.label.textContent = voice.target === 'detail' ? '追加语音' : '按住';
+    els.hold.setAttribute('aria-label', voice.target === 'detail' ? '按住追加语音，松开结束' : '按住录音，松开结束');
+    if (els.wave) els.wave.hidden = true;
     updateVoiceCopy();
-    updateSaveState();
+    if (voice.target !== 'detail') updateSaveState();
   }
 
   function abandonPendingVoiceStart() {
@@ -3891,27 +4005,28 @@
   }
 
   async function beginVoiceRecording() {
-    if (!voice.supported || voice.starting || voice.recording || !state.draft) return;
-    if (state.route.name !== 'record') return;
+    if (!voice.supported || voice.starting || voice.recording || !voiceCanRecord()) return;
     stopActiveAudio();
-    const currentClipCount = Array.isArray(state.draft.audioClips) ? state.draft.audioClips.length : 0;
+    const els = voiceEls();
+    const currentClipCount = voiceClipList().length;
     voice.holding = true;
     voice.starting = true;
     voice.recording = false;
     voice.discard = false;
     voice.chunks = [];
-    ui.holdVoice.classList.add('is-pressing');
-    ui.holdLabel.textContent = '准备中';
-    ui.voiceState.textContent = '正在打开麦克风…';
-    ui.voiceTimer.textContent = '0:00';
-    ui.voiceWave.hidden = true;
-    updateSaveState();
+    if (els.hold) els.hold.classList.add('is-pressing');
+    if (els.label) els.label.textContent = '准备中';
+    if (els.state) els.state.textContent = '正在打开麦克风…';
+    if (els.timer) els.timer.textContent = '0:00';
+    if (els.wave) els.wave.hidden = true;
+    if (voice.target !== 'detail') updateSaveState();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      if (!voice.holding || state.route.name !== 'record' || !state.draft) {
+      if (!voice.holding || !voiceCanRecord()) {
         stream.getTracks().forEach((track) => { try { track.stop(); } catch (error) { /* noop */ } });
         resetVoiceVisual();
+        if (voice.target === 'detail') clearDetailVoiceTarget();
         return;
       }
       voice.stream = stream;
@@ -3939,14 +4054,17 @@
       });
       recorder.start(250);
 
-      ui.holdVoice.classList.remove('is-pressing');
-      ui.holdVoice.classList.add('is-recording');
-      ui.holdLabel.textContent = '松开';
-      ui.voiceState.textContent = currentClipCount ? `正在听第 ${currentClipCount + 1} 段…` : '正在听…';
-      ui.voiceWave.hidden = false;
-      ui.voiceTimer.textContent = '0:00';
+      const activeEls = voiceEls();
+      if (activeEls.hold) {
+        activeEls.hold.classList.remove('is-pressing');
+        activeEls.hold.classList.add('is-recording');
+      }
+      if (activeEls.label) activeEls.label.textContent = '松开';
+      if (activeEls.state) activeEls.state.textContent = currentClipCount ? `正在听第 ${currentClipCount + 1} 段…` : '正在听…';
+      if (activeEls.wave) activeEls.wave.hidden = false;
+      if (activeEls.timer) activeEls.timer.textContent = '0:00';
       updateVoiceTimer();
-      updateSaveState();
+      if (voice.target !== 'detail') updateSaveState();
       voice.ticker = setInterval(updateVoiceTimer, 180);
       voice.limitTimer = setTimeout(() => {
         if (!voice.recording) return;
@@ -3958,6 +4076,7 @@
       voice.holding = false;
       releaseVoiceStream();
       resetVoiceVisual();
+      if (voice.target === 'detail') clearDetailVoiceTarget();
       const name = error && error.name;
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         showToast('没有麦克风权限；照片和文字仍可保存');
@@ -3981,10 +4100,12 @@
       } catch (error) {
         releaseVoiceStream();
         resetVoiceVisual();
+        if (voice.target === 'detail' && discard) clearDetailVoiceTarget();
       }
     } else {
       releaseVoiceStream();
       resetVoiceVisual();
+      if (voice.target === 'detail' && discard) clearDetailVoiceTarget();
     }
   }
 
@@ -3994,33 +4115,46 @@
     const elapsed = voice.startedAt ? performance.now() - voice.startedAt : 0;
     const chunks = voice.chunks.slice();
     const mime = voice.mime || 'audio/webm';
-    const shouldDiscard = voice.discard || state.route.name !== 'record' || !state.draft;
+    const target = voice.target;
+    const targetRecord = voice.targetRecord;
+    const shouldDiscard = voice.discard || !voiceCanRecord();
     voice.recorder = null;
     voice.chunks = [];
     voice.recording = false;
     voice.discard = false;
     resetVoiceVisual();
 
-    if (shouldDiscard) return;
+    if (shouldDiscard) {
+      if (target === 'detail') clearDetailVoiceTarget();
+      return;
+    }
     if (!chunks.length) {
       showToast('没有收到声音，再试一次吧');
+      if (target === 'detail') clearDetailVoiceTarget();
       return;
     }
     if (elapsed < 550) {
       showToast('再按久一点，声音才留得住');
+      if (target === 'detail') clearDetailVoiceTarget();
       return;
     }
     const blob = new Blob(chunks, { type: mime });
     if (!blob.size) {
       showToast('没有收到声音，再试一次吧');
+      if (target === 'detail') clearDetailVoiceTarget();
       return;
     }
     const clip = {
       blob,
       durationMs: Math.max(1000, Math.round(elapsed)),
-      mime,
-      url: URL.createObjectURL(blob)
+      mime
     };
+    if (target === 'detail') {
+      if (targetRecord) appendDetailVoice(targetRecord, clip);
+      clearDetailVoiceTarget();
+      return;
+    }
+    clip.url = URL.createObjectURL(blob);
     state.draft.audioClips.push(clip);
     renderDraftAudio();
     updateSaveState();
@@ -4040,6 +4174,176 @@
     }
     voice.recorder = null;
     voice.chunks = [];
+  }
+
+  /* ---------------- 详情页：改字 / 追加语音 ---------------- */
+
+  function clearDetailVoiceTarget() {
+    voice.target = null;
+    voice.targetRecord = null;
+    voice.targetClips = null;
+  }
+
+  function dropAudioUrls(recordId) {
+    Array.from(state.audioUrls.keys()).forEach((key) => {
+      if (key.indexOf(recordId + ':') === 0) {
+        const url = state.audioUrls.get(key);
+        try { URL.revokeObjectURL(url); } catch (error) { /* noop */ }
+        state.audioUrls.delete(key);
+      }
+    });
+  }
+
+  function syncRecordInState(record) {
+    const index = state.records.findIndex((item) => item.id === record.id);
+    if (index >= 0) state.records[index] = record;
+  }
+
+  function beginDetailVoice(record) {
+    if (!record) return;
+    if (voice.recording || voice.starting) return;
+    if (state.route.name !== 'detail') return;
+    if (!voice.supported) {
+      showToast('这个浏览器暂时不能录音');
+      return;
+    }
+    voice.target = 'detail';
+    voice.targetRecord = record;
+    voice.targetClips = recordAudioClips(record);
+    beginVoiceRecording();
+  }
+
+  async function appendDetailVoice(record, clip) {
+    const clips = Array.isArray(record.audioClips)
+      ? record.audioClips.filter((item) => item && item.blob instanceof Blob).slice()
+      : [];
+    if (record.audio instanceof Blob) {
+      clips.unshift({
+        blob: record.audio,
+        durationMs: Number(record.audioDurationMs) || 0,
+        mime: record.audio.type || 'audio/webm'
+      });
+      delete record.audio;
+      delete record.audioDurationMs;
+    }
+    clips.push({
+      blob: clip.blob,
+      durationMs: clip.durationMs,
+      mime: clip.mime
+    });
+    record.audioClips = clips;
+    record.updatedAt = Date.now();
+
+    if (state.activeAudio) stopActiveAudio();
+    dropAudioUrls(record.id);
+
+    let persisted = state.storageMode === 'indexeddb';
+    if (persisted) {
+      try {
+        await saveRecord(record);
+      } catch (error) {
+        persisted = false;
+        state.storageMode = 'memory';
+        state.db = null;
+        console.warn('拾色：语音写回失败，已切换到内存预览模式。', error);
+      }
+    }
+    syncRecordInState(record);
+    if (state.route.name === 'detail' && state.currentRecord && state.currentRecord.id === record.id) {
+      renderDurableRecord(record);
+    }
+    showToast(persisted ? '已添加语音' : '当前无法本地保存，刷新后会丢失');
+  }
+
+  async function saveDetailNote(record, raw) {
+    const note = String(raw || '').trim().slice(0, MAX_NOTE);
+    record.note = note;
+    record.updatedAt = Date.now();
+
+    if (state.activeAudio) stopActiveAudio();
+
+    let persisted = state.storageMode === 'indexeddb';
+    if (persisted) {
+      try {
+        await saveRecord(record);
+      } catch (error) {
+        persisted = false;
+        state.storageMode = 'memory';
+        state.db = null;
+        console.warn('拾色：备注写回失败，已切换到内存预览模式。', error);
+      }
+    }
+    syncRecordInState(record);
+    if (state.route.name === 'detail' && state.currentRecord && state.currentRecord.id === record.id) {
+      renderDurableRecord(record);
+    }
+    showToast(persisted ? '已保存' : '当前无法本地保存，刷新后会丢失');
+  }
+
+  function bindDetailNote(record) {
+    const view = $('#detailNoteView', ui.detailContent);
+    const editBtn = $('#detailNoteEdit', ui.detailContent);
+    const box = $('#detailNoteEditBox', ui.detailContent);
+    const input = $('#detailNoteInput', ui.detailContent);
+    const count = $('#detailNoteCount', ui.detailContent);
+    const saveBtn = $('#detailNoteSave', ui.detailContent);
+    const cancelBtn = $('#detailNoteCancel', ui.detailContent);
+    if (!view || !editBtn || !box || !input) return;
+
+    editBtn.addEventListener('click', () => {
+      input.value = typeof record.note === 'string' ? record.note : '';
+      count.textContent = `${input.value.length} / ${MAX_NOTE}`;
+      view.hidden = true;
+      box.hidden = false;
+      input.focus();
+      const length = input.value.length;
+      try { input.setSelectionRange(length, length); } catch (error) { /* noop */ }
+    });
+
+    input.addEventListener('input', () => {
+      count.textContent = `${input.value.length} / ${MAX_NOTE}`;
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      box.hidden = true;
+      view.hidden = false;
+    });
+
+    saveBtn.addEventListener('click', () => {
+      saveDetailNote(record, input.value);
+    });
+  }
+
+  function bindDetailVoice(record) {
+    ui.detailAddVoice = $('#detailAddVoice', ui.detailContent);
+    ui.detailVoiceLabel = $('#detailVoiceLabel', ui.detailContent);
+    ui.detailVoiceState = $('#detailVoiceState', ui.detailContent);
+    ui.detailVoiceTimer = $('#detailVoiceTimer', ui.detailContent);
+    ui.detailVoiceWave = $('#detailVoiceWave', ui.detailContent);
+    ui.detailVoiceHint = $('#detailVoiceHint', ui.detailContent);
+    ui.detailVoiceUnsupported = $('#detailVoiceUnsupported', ui.detailContent);
+    const btn = ui.detailAddVoice;
+    if (!btn) return;
+
+    btn.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      try { btn.setPointerCapture(event.pointerId); } catch (error) { /* noop */ }
+      beginDetailVoice(record);
+    });
+    btn.addEventListener('contextmenu', (event) => event.preventDefault());
+    btn.addEventListener('keydown', (event) => {
+      if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+        event.preventDefault();
+        beginDetailVoice(record);
+      }
+    });
+    btn.addEventListener('keyup', (event) => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        if (voice.recording || voice.starting) stopVoiceRecording();
+      }
+    });
   }
 
   /* ---------------- 记录页 ---------------- */
@@ -4426,16 +4730,47 @@
         <div class="detail-kicker" id="paletteKicker"><span>这张照片的颜色</span><span>${colors.length} 种</span></div>
         <div class="palette-grid">${colorCells}</div>
       </section>
-      ${note ? `<p class="detail-note">${escapeHtml(note)}</p>` : ''}
-      ${clips.length ? `
-        <section class="detail-voice" aria-label="${clips.length > 1 ? `${clips.length} 段录音` : '这段记录的声音'}">
-          <div class="detail-kicker">
-            <span>${clips.length > 1 ? `${clips.length} 段声音` : '一段声音'}</span>
-            <span>${escapeHtml(durationText(audioTotal))}</span>
+      <section class="detail-note-area" aria-label="一句话">
+        <div class="detail-note-view${note ? '' : ' is-empty'}" id="detailNoteView">
+          ${note ? `<p class="detail-note" id="detailNoteText">${escapeHtml(note)}</p>` : ''}
+          <button class="detail-mini-btn" id="detailNoteEdit" type="button">改字</button>
+        </div>
+        <div class="detail-note-edit" id="detailNoteEditBox" hidden>
+          <div class="note-wrap">
+            <textarea class="note-input detail-note-input" id="detailNoteInput" maxlength="${MAX_NOTE}" rows="3" placeholder="此刻的你，想记录什么？"></textarea>
+            <span class="note-count" id="detailNoteCount">0 / ${MAX_NOTE}</span>
           </div>
-          ${audioPlayerMarkup(clips.length > 1 ? '从头连播这几段声音' : '留在这一刻的声音').replace('class="audio-player"', 'class="audio-player audio-player--detail"')}
-        </section>
-      ` : ''}
+          <div class="detail-note-actions">
+            <button class="detail-mini-btn is-primary" id="detailNoteSave" type="button">保存</button>
+            <button class="detail-mini-btn" id="detailNoteCancel" type="button">取消</button>
+          </div>
+        </div>
+      </section>
+      <section class="detail-voice" aria-label="${clips.length > 1 ? `${clips.length} 段录音` : '这一页的声音'}">
+        <div class="detail-kicker">
+          <span>${clips.length ? (clips.length > 1 ? `${clips.length} 段声音` : '一段声音') : '声音'}</span>
+          <span>${clips.length ? escapeHtml(durationText(audioTotal)) : '可选'}</span>
+        </div>
+        ${clips.length ? audioPlayerMarkup(clips.length > 1 ? '从头连播这几段声音' : '留在这一刻的声音').replace('class="audio-player"', 'class="audio-player audio-player--detail"') : ''}
+        <div class="detail-voice-console">
+          <button class="hold-voice detail-voice-btn" id="detailAddVoice" type="button" aria-label="按住追加语音，松开结束">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9.2" y="3.7" width="5.6" height="10.3" rx="2.8"/>
+              <path d="M6.6 11.3a5.4 5.4 0 0 0 10.8 0M12 16.8v3.4M9.5 20.2h5"/>
+            </svg>
+            <span class="hold-label" id="detailVoiceLabel">追加语音</span>
+          </button>
+          <div class="voice-copy">
+            <p class="voice-state" id="detailVoiceState">按住开始，松手结束</p>
+            <div class="voice-timer-row">
+              <span class="voice-timer" id="detailVoiceTimer">最长 5 分钟</span>
+              <span class="voice-wave" id="detailVoiceWave" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <p class="voice-hint" id="detailVoiceHint">把当时的声音，也补在这页里。</p>
+          </div>
+        </div>
+        <p class="voice-unsupported" id="detailVoiceUnsupported" hidden></p>
+      </section>
       <p class="detail-end">拾于 ${escapeHtml(`${date.getFullYear()}.${pad2(date.getMonth() + 1)}.${pad2(date.getDate())}`)}</p>
     `;
 
@@ -4453,6 +4788,9 @@
       const player = $('[data-audio-player]', ui.detailContent);
       setupAudioPlayer(player, audioSources);
     }
+    bindDetailNote(record);
+    bindDetailVoice(record);
+    detectVoiceSupport();
   }
 
   async function handleSave(event) {
@@ -4600,6 +4938,11 @@
     if (next.name !== 'record') {
       stopActiveAudio();
     }
+    if (voice.target === 'detail' && next.name !== 'detail') {
+      // 录音中途离开详情页：停掉麦克风，丢掉这段半截录音。
+      stopVoiceRecording({ discard: true });
+      clearDetailVoiceTarget();
+    }
 
     if (next.name === 'home') {
       state.route = next;
@@ -4698,14 +5041,20 @@
       const name = '拾色备份-' + d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0') + '.json';
       const file = new File([json], name, { type: 'application/json' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: name }); return; }
-        catch (e) { if (e && e.name === 'AbortError') return; }
+        try {
+          await navigator.share({ files: [file], title: name });
+          markBackupDone();
+          return;
+        } catch (e) {
+          if (e && e.name === 'AbortError') return;
+        }
       }
       const url = URL.createObjectURL(file);
       const a = document.createElement('a');
       a.href = url; a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+      markBackupDone();
       showToast('备份已导出');
     } catch (err) {
       console.error(err);
@@ -4743,6 +5092,52 @@
     ex.addEventListener('click', exportBackup);
     im.addEventListener('click', function () { fi.value = ''; fi.click(); });
     fi.addEventListener('change', function () { importBackup(fi.files && fi.files[0]); });
+  }
+
+  // 申请持久存储：降低浏览器自动清理本地数据的风险
+  async function requestPersistStorage() {
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        const already = await navigator.storage.persisted();
+        if (!already) {
+          await navigator.storage.persist();
+        }
+      }
+    } catch (e) {
+      // 不支持就跳过，不影响使用
+    }
+  }
+
+  // 备份提醒：超过 15 天未导出备份时，每天最多提示一次
+  const BACKUP_REMIND_DAYS = 15;
+  const LS_LAST_BACKUP = 'shise_lastBackupAt';
+  const LS_BACKUP_TIP_DAY = 'shise_backupTipDay';
+
+  function markBackupDone() {
+    try {
+      localStorage.setItem(LS_LAST_BACKUP, String(Date.now()));
+    } catch (e) {}
+  }
+
+  function checkBackupReminder() {
+    try {
+      if (!state.records || state.records.length === 0) return;
+      const now = Date.now();
+      const last = Number(localStorage.getItem(LS_LAST_BACKUP));
+      if (!last) {
+        // 从未备份过：从今天开始计时，避免第一次打开就提示
+        localStorage.setItem(LS_LAST_BACKUP, String(now));
+        return;
+      }
+      const days = (now - last) / 86400000;
+      if (days < BACKUP_REMIND_DAYS) return;
+      const today = new Date().toDateString();
+      if (localStorage.getItem(LS_BACKUP_TIP_DAY) === today) return;
+      localStorage.setItem(LS_BACKUP_TIP_DAY, today);
+      setTimeout(function () {
+        showToast('已经 ' + Math.floor(days) + ' 天没备份啦，记得点底部「导出」存一份');
+      }, 1200);
+    } catch (e) {}
   }
 
   // ===== 自动检查更新：后台比对服务器文件指纹，有新版才刷新一次 =====
@@ -4991,6 +5386,7 @@
     });
     bindEvents();
     bindBackup();
+    requestPersistStorage();
     window.setTimeout(checkAppUpdate, 2500);
     setupPicking();
     detectVoiceSupport();
@@ -5009,6 +5405,7 @@
     }
     state.ready = true;
     handleRoute();
+    checkBackupReminder();
     if (state.storageMode === 'indexeddb') {
       window.setTimeout(() => {
         migrateLegacyPalettes().catch((error) => console.error('拾色：旧记录迁移失败', error));
