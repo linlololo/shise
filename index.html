@@ -1715,6 +1715,7 @@
     margin: 0;
   }
   .detail-note-view.is-empty { justify-content: flex-start; }
+  .detail-note--empty { opacity: .45; }
   .detail-mini-btn {
     appearance: none;
     -webkit-appearance: none;
@@ -4256,65 +4257,6 @@
     showToast(persisted ? '已添加语音' : '当前无法本地保存，刷新后会丢失');
   }
 
-  async function saveDetailNote(record, raw) {
-    const note = String(raw || '').trim().slice(0, MAX_NOTE);
-    record.note = note;
-    record.updatedAt = Date.now();
-
-    if (state.activeAudio) stopActiveAudio();
-
-    let persisted = state.storageMode === 'indexeddb';
-    if (persisted) {
-      try {
-        await saveRecord(record);
-      } catch (error) {
-        persisted = false;
-        state.storageMode = 'memory';
-        state.db = null;
-        console.warn('拾色：备注写回失败，已切换到内存预览模式。', error);
-      }
-    }
-    syncRecordInState(record);
-    if (state.route.name === 'detail' && state.currentRecord && state.currentRecord.id === record.id) {
-      renderDurableRecord(record);
-    }
-    showToast(persisted ? '已保存' : '当前无法本地保存，刷新后会丢失');
-  }
-
-  function bindDetailNote(record) {
-    const view = $('#detailNoteView', ui.detailContent);
-    const editBtn = $('#detailNoteEdit', ui.detailContent);
-    const box = $('#detailNoteEditBox', ui.detailContent);
-    const input = $('#detailNoteInput', ui.detailContent);
-    const count = $('#detailNoteCount', ui.detailContent);
-    const saveBtn = $('#detailNoteSave', ui.detailContent);
-    const cancelBtn = $('#detailNoteCancel', ui.detailContent);
-    if (!view || !editBtn || !box || !input) return;
-
-    editBtn.addEventListener('click', () => {
-      input.value = typeof record.note === 'string' ? record.note : '';
-      count.textContent = `${input.value.length} / ${MAX_NOTE}`;
-      view.hidden = true;
-      box.hidden = false;
-      input.focus();
-      const length = input.value.length;
-      try { input.setSelectionRange(length, length); } catch (error) { /* noop */ }
-    });
-
-    input.addEventListener('input', () => {
-      count.textContent = `${input.value.length} / ${MAX_NOTE}`;
-    });
-
-    cancelBtn.addEventListener('click', () => {
-      box.hidden = true;
-      view.hidden = false;
-    });
-
-    saveBtn.addEventListener('click', () => {
-      saveDetailNote(record, input.value);
-    });
-  }
-
   function bindDetailVoice(record) {
     ui.detailAddVoice = $('#detailAddVoice', ui.detailContent);
     ui.detailVoiceLabel = $('#detailVoiceLabel', ui.detailContent);
@@ -4733,18 +4675,7 @@
       </section>
       <section class="detail-note-area" aria-label="一句话">
         <div class="detail-note-view${note ? '' : ' is-empty'}" id="detailNoteView">
-          ${note ? `<p class="detail-note" id="detailNoteText">${escapeHtml(note)}</p>` : ''}
-          <button class="detail-mini-btn" id="detailNoteEdit" type="button">改字</button>
-        </div>
-        <div class="detail-note-edit" id="detailNoteEditBox" hidden>
-          <div class="note-wrap">
-            <textarea class="note-input detail-note-input" id="detailNoteInput" maxlength="${MAX_NOTE}" rows="3" placeholder="此刻的你，想记录什么？"></textarea>
-            <span class="note-count" id="detailNoteCount">0 / ${MAX_NOTE}</span>
-          </div>
-          <div class="detail-note-actions">
-            <button class="detail-mini-btn is-primary" id="detailNoteSave" type="button">保存</button>
-            <button class="detail-mini-btn" id="detailNoteCancel" type="button">取消</button>
-          </div>
+          ${note ? `<p class="detail-note" id="detailNoteText">${escapeHtml(note)}</p>` : '<p class="detail-note detail-note--empty">此刻没有留下文字。</p>'}
         </div>
       </section>
       <section class="detail-voice" aria-label="${clips.length > 1 ? `${clips.length} 段录音` : '这一页的声音'}">
@@ -4789,7 +4720,6 @@
       const player = $('[data-audio-player]', ui.detailContent);
       setupAudioPlayer(player, audioSources);
     }
-    bindDetailNote(record);
     bindDetailVoice(record);
     detectVoiceSupport();
   }
