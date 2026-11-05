@@ -4950,6 +4950,7 @@
       setPage('home');
       document.title = '拾色 · 色谱';
       scrollHomeSoon();
+      applyAppUpdate();
       return;
     }
 
@@ -5145,17 +5146,27 @@
   }
 
   // ===== 自动检查更新：后台比对服务器文件指纹，有新版才刷新一次 =====
+  // 记录页、录音中或有未保存内容时不刷新，回到首页再更新；localStorage 全部走 safeLocalStorage 兜底
+  let pendingUpdateReload = false;
+  function applyAppUpdate() {
+    if (!pendingUpdateReload) return;
+    if (voice.recording || voice.starting) return;
+    if (state.route.name === 'home' && !hasDraftContent()) {
+      try { sessionStorage.setItem('sk-updated', '1'); } catch (e) {}
+      location.reload();
+    }
+  }
   function checkAppUpdate() {
     if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
     fetch(location.pathname, { method: 'HEAD', cache: 'no-cache' })
       .then((res) => {
         const tag = res.headers.get('etag') || res.headers.get('last-modified');
         if (!tag) return;
-        const prev = localStorage.getItem('sk-etag');
-        localStorage.setItem('sk-etag', tag);
-        if (prev && prev !== tag && !sessionStorage.getItem('sk-updated')) {
-          sessionStorage.setItem('sk-updated', '1');
-          location.reload();
+        const prev = safeLocalStorage.get('sk-etag');
+        safeLocalStorage.set('sk-etag', tag);
+        if (prev && prev !== tag) {
+          pendingUpdateReload = true;
+          applyAppUpdate();
         }
       })
       .catch(() => {});
