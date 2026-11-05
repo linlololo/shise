@@ -4035,7 +4035,10 @@
       const mime = chooseAudioMime();
       let recorder;
       try {
-        recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        // 目标码率约 64kbps；浏览器可能忽略，仅作尽力而为的设置，不做额外压缩
+        recorder = mime
+          ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 })
+          : new MediaRecorder(stream, { audioBitsPerSecond: 64000 });
       } catch (error) {
         recorder = new MediaRecorder(stream);
       }
