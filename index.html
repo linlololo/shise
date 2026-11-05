@@ -5072,6 +5072,10 @@
         const rec = bkUnpack(raw);
         if (!rec || !rec.id) continue;
         if (existing.has(rec.id)) { skipped++; continue; }
+        // 已有非空 colors 的旧记录标记为 v2，防止启动迁移重算覆盖手动取色
+        if (Array.isArray(rec.colors) && rec.colors.length > 0 && rec.paletteVersion !== 2) {
+          rec.paletteVersion = 2;
+        }
         await saveRecord(rec);
         added++;
       }
