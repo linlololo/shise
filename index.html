@@ -2464,9 +2464,11 @@
     if (days <= 0) {
       return { stage: -1, p: 1, label: '新漆' };
     }
+    if (days === 1) {
+      return { stage: 0, p: 0, label: '入荫' };
+    }
     const stage = Math.min(SK_OPEN_DAYS, days);
     let label = '开色 ' + stage + '/' + SK_OPEN_DAYS;
-    if (stage === 0) label = '入荫';
     if (stage >= SK_OPEN_DAYS) label = '已开色';
     return { stage: stage, p: stage / SK_OPEN_DAYS, label: label };
   }
